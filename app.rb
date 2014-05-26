@@ -1,12 +1,15 @@
 require 'curses'
 require 'pry'
 require 'pry-debugger'
+require './permissive_fov'
+require 'set'
 COLOR_IDS = {}
 def c(i)
   COLOR_IDS[i] ||= begin
-    COLOR_IDS.values.max+1
+    (COLOR_IDS.values.max || 0)+1
   end
 end
+COLOR_ATTRS = {}
 
 WIDTH = 40
 HEIGHT = 20
@@ -19,7 +22,7 @@ class Tile
     when 'x'
       Tile.new(x, y, '.', nil, random_monster)
     else
-      Tile.new(x, y, c,nil,nil)
+      Tile.new(x, y, c, nil, nil)
     end
   end
   def self.random_item
@@ -51,8 +54,16 @@ class Tile
     monster.nil? && %w(. <).include?(terrain)
   end
 
+  def block_los?
+    %w(# [).include?(terrain)
+  end
+
   def bump!(player)
-    # no op, for now.
+    case terrain
+    when '['
+      player.energy += 1
+      @terrain = '#'
+    end
   end
 end
 
@@ -230,6 +241,7 @@ class Vault
 end
 
 class Level
+  include PermissiveFieldOfView
   def initialize
     @map = Array.new(WIDTH) do |x|
       Array.new(HEIGHT) do |y|
@@ -240,7 +252,26 @@ class Level
         end
       end
     end
+    @memories = {}
     build
+  end
+
+  def calculate_los(x,y,r)
+    @lit_spaces = []
+    do_fov(x,y,r, WIDTH, HEIGHT)
+  end
+  def light(x,y)
+    @lit_spaces << [x,y]
+    @memories[[x,y]] = @map[x][y].dup
+  end
+  def lit?(x,y)
+    @lit_spaces.include?([x,y])
+  end
+  def blocked?(x,y)
+    @map[x][y].block_los?
+  end
+  def memory(x,y)
+    @memories[[x,y]]
   end
 
   attr_reader :map
@@ -389,6 +420,7 @@ class Player
   def initialize(tile)
     @location = tile
     tile.monster = self
+    @energy = 3
   end
   def move!(tile)
     if @location
@@ -405,6 +437,13 @@ class Player
   end
   def chr
     '@'
+  end
+  attr_accessor :energy
+
+  [1,2,3].each do |i|
+    define_method("item#{i}") do
+      nil
+    end
   end
 end
 
@@ -425,28 +464,40 @@ class MainGame
     Curses::refresh
   end
   def draw_map(offset_x, offset_y)
+    @level.calculate_los(@player.x, @player.y, 5)
     WIDTH.times do |x|
       HEIGHT.times do |y|
         Curses::setpos(y+offset_y,x+offset_x)
-        Curses::addstr(@level.map[x][y].chr)
+        if @level.lit?(x,y)
+          draw_str(@level.map[x][y].chr, :white)
+        elsif @level.memory(x,y)
+          draw_str(@level.memory(x,y).chr, :gray)
+        else
+          draw_str(" ", :white)
+        end
       end
     end
   end
   def draw_status(offset_x, offset_y)
     [
-      'Commando',
-      'hp: 10/10',
-      '',
-      '******',
-      '',
-      'phaser (***)',
-      'energy shield (*)',
-      'tether beam (*)',
-      '(empty)',
-      '(empty)',
-    ].each_with_index do |str,i|
+      "Commando",
+      "hp: 10/10",
+      "",
+      "*"*@player.energy,
+      "",
+      @player.item1,
+      @player.item2,
+      @player.item3,
+    ].each_with_index do |(str, color),i|
       Curses::setpos(i+offset_y,offset_x)
-      Curses::addstr(str)
+      draw_str(str,color||:white)
+    end
+  end
+
+  def draw_str(str, color)
+    # binding.pry unless color
+    Curses::attron(Curses::color_pair(c(color)) | (COLOR_ATTRS[color]||0) | Curses::A_NORMAL) do
+      Curses::addstr(str||"")
     end
   end
 
@@ -484,9 +535,13 @@ begin
   Curses::start_color
 
   # INIT colors
-  # Curses::init_pair(c(:blue),Curses::COLOR_BLUE,Curses::COLOR_BLACK)
-  # Curses::init_pair(c(:red),Curses::COLOR_RED,Curses::COLOR_BLACK)
-  # Curses::init_pair(c(:green),Curses::COLOR_GREEN,Curses::COLOR_BLACK)
+  Curses::init_pair(c(:white),Curses::COLOR_WHITE,Curses::COLOR_BLACK)
+  # COLOR_ATTRS[:white] = Curses::A_BOLD
+  Curses::init_pair(c(:blue),Curses::COLOR_BLUE,Curses::COLOR_BLACK)
+  Curses::init_pair(c(:red),Curses::COLOR_RED,Curses::COLOR_BLACK)
+  Curses::init_pair(c(:green),Curses::COLOR_GREEN,Curses::COLOR_BLACK)
+  Curses::init_pair(c(:gray),Curses::COLOR_BLACK,Curses::COLOR_BLACK)
+  COLOR_ATTRS[:gray] = Curses::A_BOLD
 
   current_action = m
   Curses::curs_set(0)
