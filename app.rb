@@ -9,36 +9,44 @@ def c(i)
     (COLOR_IDS.values.max || 0)+1
   end
 end
-COLOR_ATTRS = {}
+COLOR_ATTRS = {
+  'bright' => Curses::A_BOLD,
+}
 
 WIDTH = 40
-HEIGHT = 20
+HEIGHT = 40
 
 class Tile
   def self.build(x, y, c)
     case c
     when '*'
-      Tile.new(x, y, '.', random_item, nil)
+      t = Tile.new(x, y, '.')
+      t.item = random_item(t)
+      t
     when 'x'
-      Tile.new(x, y, '.', nil, random_monster)
+      t = Tile.new(x, y, '.')
+      t.monster = random_monster(t)
+      t
     else
-      Tile.new(x, y, c, nil, nil)
+      Tile.new(x, y, c)
     end
   end
-  def self.random_item
+  def self.random_item(tile)
     nil
   end
 
-  def self.random_monster
-    nil
+  def self.random_monster(tile)
+    [
+      Mutant,
+    ].shuffle.pop.new(tile)
   end
 
   attr_accessor :terrain, :item, :monster, :x, :y
-  def initialize x, y, terrain, item, monster
+  def initialize x, y, terrain
     @x, @y = x, y
     @terrain = terrain
-    @item = item
-    @monster = monster
+    @item = nil
+    @monster = nil
   end
   def chr
     if monster
@@ -47,6 +55,19 @@ class Tile
       item.chr
     else
       terrain
+    end
+  end
+
+  def color
+    if monster
+      monster.color
+    elsif item
+      item.color
+    else
+      {
+        '#' => 'blue',
+        '[' => 'bright_yellow',
+      }[terrain] || 'white'
     end
   end
 
@@ -421,6 +442,7 @@ class Player
     @location = tile
     tile.monster = self
     @energy = 3
+    @cooldown = 0
   end
   def move!(tile)
     if @location
@@ -429,6 +451,12 @@ class Player
     tile.monster = self
     @location = tile
   end
+
+  def movement!(tile)
+    move!(tile)
+    @cooldown += 1
+  end
+
   def x
     @location.x
   end
@@ -438,42 +466,36 @@ class Player
   def chr
     '@'
   end
-  attr_accessor :energy
+
+  def attack(monster)
+    monster.hit(1)
+  end
+
+  attr_accessor :energy, :cooldown
 
   [1,2,3].each do |i|
     define_method("item#{i}") do
       nil
     end
   end
+
+  def color
+    'white'
+  end
 end
 
-class MainGame
-  def initialize
-    @level = Level.new
-    @player = Player.new(@level.find_terrain('<'))
-  end
-  def should_process_input?
-    true
-  end
-  def should_idle?
-    false
-  end
-  def draw
-    draw_map(0,0)
-    draw_status(WIDTH+1,0)
-    Curses::refresh
-  end
+class GameMode
   def draw_map(offset_x, offset_y)
     @level.calculate_los(@player.x, @player.y, 5)
     WIDTH.times do |x|
       HEIGHT.times do |y|
         Curses::setpos(y+offset_y,x+offset_x)
         if @level.lit?(x,y)
-          draw_str(@level.map[x][y].chr, :white)
+          draw_str(@level.map[x][y].chr, @level.map[x][y].color)
         elsif @level.memory(x,y)
-          draw_str(@level.memory(x,y).chr, :gray)
+          draw_str(@level.memory(x,y).chr, 'bright_blackblack')
         else
-          draw_str(" ", :white)
+          draw_str(" ", 'white')
         end
       end
     end
@@ -488,17 +510,142 @@ class MainGame
       @player.item1,
       @player.item2,
       @player.item3,
+      '',
+      '',
+      '',
+      'hjkl: move',
+      '123: use item',
     ].each_with_index do |(str, color),i|
       Curses::setpos(i+offset_y,offset_x)
-      draw_str(str,color||:white)
+      draw_str(str,color||'white')
     end
   end
 
-  def draw_str(str, color)
+  def draw_str(str, color_str)
     # binding.pry unless color
-    Curses::attron(Curses::color_pair(c(color)) | (COLOR_ATTRS[color]||0) | Curses::A_NORMAL) do
+    *attrs, color = color_str.split('_')
+    curses_attrs = 0
+    attrs.each do |a|
+      curses_attrs |= COLOR_ATTRS[a]
+    end
+
+
+    Curses::attron(Curses::color_pair(c(color)) | curses_attrs | Curses::A_NORMAL) do
       Curses::addstr(str||"")
     end
+  end
+end
+
+class Phaser < GameMode
+  def initialize stack, level, player
+    @prev = stack
+    @level = level
+    @player = player
+    @x, @y = player.x, player.y
+  end
+  def should_idle?
+    false
+  end
+  def should_process_input?
+    true
+  end
+
+  def draw
+    draw_map(0,0)
+    Curses::setpos(@y,@x)
+    if @level.lit?(@x, @y)
+      draw_str("X",'red')
+    else
+      draw_str("X",'blue')
+    end
+    draw_status(WIDTH+1,0)
+    Curses::refresh
+  end
+
+  def process_input! c
+    case c
+    when 'h'
+      @x-=1
+    when 'j'
+      @y+=1
+    when 'k'
+      @y-=1
+    when 'l'
+      @x+=1
+    when 13.chr
+    end
+    self
+  end
+end
+
+class Mutant
+  attr_accessor :hp
+
+  def initialize(tile)
+    @location = tile
+    tile.monster = self
+    @hp = 2
+    @regen_cooldown = 0
+  end
+
+  def chr
+    if @hp >=2
+      '8'
+    else
+      'o'
+    end
+  end
+
+  def color
+    'bright_green'
+  end
+
+  def hit(a)
+    @hp -= 1
+    @regen_cooldown = 0
+  end
+
+  def move!
+    @regen_cooldown += 1
+    @hp = 2 if @regen_cooldown == 3
+  end
+
+  def die!
+    @location.monster = nil
+  end
+end
+
+class MainGame < GameMode
+  def initialize
+    @level = Level.new
+    @player = Player.new(@level.find_terrain('<'))
+  end
+  def should_process_input?
+    !should_idle?
+  end
+
+  def monsters
+    WIDTH.times.map do |x|
+      HEIGHT.times.map do |y|
+        @level.map[x][y].monster
+      end
+    end.flatten.compact - [@player]
+  end
+
+  def idle!
+    monsters.each do |m|
+      m.move!
+    end
+    @player.cooldown -= 1
+    self
+  end
+  def should_idle?
+    @player.cooldown > 0
+  end
+  def draw
+    draw_map(0,0)
+    draw_status(WIDTH+1,0)
+    Curses::refresh
   end
 
   def process_input! c
@@ -511,15 +658,18 @@ class MainGame
       attempt_move(@level.map[@player.x][@player.y-1])
     when 'l'
       attempt_move(@level.map[@player.x+1][@player.y])
+    when '1'
+      return Phaser.new(self, @level, @player)
     end
     self
   end
 
   def attempt_move(tile)
     if tile.can_move_into?
-      @player.move!(tile)
+      @player.movement!(tile)
     elsif tile.monster
       @player.attack(tile.monster)
+      tile.monster.die! if tile.monster.hp <= 0
     else
       tile.bump!(@player)
     end
@@ -535,13 +685,15 @@ begin
   Curses::start_color
 
   # INIT colors
-  Curses::init_pair(c(:white),Curses::COLOR_WHITE,Curses::COLOR_BLACK)
-  # COLOR_ATTRS[:white] = Curses::A_BOLD
-  Curses::init_pair(c(:blue),Curses::COLOR_BLUE,Curses::COLOR_BLACK)
-  Curses::init_pair(c(:red),Curses::COLOR_RED,Curses::COLOR_BLACK)
-  Curses::init_pair(c(:green),Curses::COLOR_GREEN,Curses::COLOR_BLACK)
-  Curses::init_pair(c(:gray),Curses::COLOR_BLACK,Curses::COLOR_BLACK)
-  COLOR_ATTRS[:gray] = Curses::A_BOLD
+  Curses::init_pair(c('white'),Curses::COLOR_WHITE,Curses::COLOR_BLACK)
+  # COLOR_ATTRS['white'] = Curses::A_BOLD
+  Curses::init_pair(c('blue'),Curses::COLOR_BLUE,Curses::COLOR_BLACK)
+  Curses::init_pair(c('red'),Curses::COLOR_RED,Curses::COLOR_BLACK)
+  Curses::init_pair(c('green'),Curses::COLOR_GREEN,Curses::COLOR_BLACK)
+  Curses::init_pair(c('black'),Curses::COLOR_BLACK,Curses::COLOR_BLACK)
+  # COLOR_ATTRS['black'] = Curses::A_BOLD
+  Curses::init_pair(c('yellow'),Curses::COLOR_YELLOW,Curses::COLOR_BLACK)
+  # COLOR_ATTRS['yellow'] = Curses::A_BOLD
 
   current_action = m
   Curses::curs_set(0)
