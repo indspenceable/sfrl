@@ -53,9 +53,11 @@ class Tile
   def activate!(prev, level, player)
     case
     when @terrain == '<'
+      player.message!("it's dangerous to go back")
       prev
     when @terrain == '>'
-      MainGame.new(player)
+      player.message!("you walk down the stairs")
+      MainGame.new(level.difficulty+1, player)
     when @item
       # item upgrade prompt
       # prev
@@ -340,6 +342,8 @@ class GameMode
       '',
       'hjkl: move',
       '12345: use item',
+      '',
+      *@player.messages.last(10)
     ].each_with_index do |(str, color),i|
       Curses::setpos(i+offset_y,offset_x)
       draw_str(str,color||'white')
@@ -372,8 +376,11 @@ require './mobiles/hulk'
 require './mobiles/player'
 
 class MainGame < GameMode
-  def initialize(pl=nil)
-    @level = Level.new
+  def difficulty
+    @level.difficulty
+  end
+  def initialize(difficulty=0,pl=nil)
+    @level = Level.new(difficulty)
     pl ||= begin
       p = Player.new(@level.find_terrain('<'))
       p.equip(1, BasicPhaser.new)
@@ -405,7 +412,7 @@ class MainGame < GameMode
     monsters.each do |m|
       m.act!(@level, @player)
     end
-    @player.cooldown -= 1
+    @player.cool(1)
     self
   end
   def should_idle?

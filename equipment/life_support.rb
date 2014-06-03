@@ -19,7 +19,7 @@ class BasicLifeSupport
       old_energy = player.energy
       player.energy -= cost
       player.heal!(life_recovery)
-      player.cooldown += cooldown
+      player.wait(cooldown)
       stack
     else
       stack

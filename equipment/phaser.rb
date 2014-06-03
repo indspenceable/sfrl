@@ -31,8 +31,9 @@ class BasicPhaser
 
   def fire!(prev, player, target)
     @shots-=1
-    target.get_hit(2)
-    player.cooldown += 1
+    player.message!("You shoot the #{target.class.name}")
+    target.get_hit(2, player)
+    player.wait(1)
     return prev
   end
 

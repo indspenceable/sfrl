@@ -19,6 +19,10 @@ class Mutant < MonsterBase
     2.times{ move_towards_player(level, player) if level.lit?(x, y) }
   end
 
+  def attack_message
+    "the mutant mangles you."
+  end
+
   def describe
     "This mutant is weak, but it's extra legs allow it to move twice as fast as you."
   end

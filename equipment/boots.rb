@@ -38,7 +38,7 @@ class BasicBoots
   def jump!(prev, player, target)
     player.energy -= cost
     player.move!(target)
-    player.cooldown += 1
+    player.wait(1)
     prev
   end
 

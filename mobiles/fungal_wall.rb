@@ -18,8 +18,8 @@ class FungalWall < MonsterBase
     end
   end
 
-  def get_hit(a)
-    super(a)
+  def get_hit(a,player)
+    super(a,player)
     @regen_cooldown = 0
   end
 
@@ -45,7 +45,7 @@ class SpreadingSpore < MonsterBase
   end
 
   def color
-    'bright_black'
+    'magenta'
   end
 
   def act!(level, _player)

@@ -1,6 +1,8 @@
 class Level
   include PermissiveFieldOfView
-  def initialize
+  attr_reader :difficulty
+  def initialize(difficulty)
+    @difficulty = difficulty
     @map = Array.new(WIDTH) do |x|
       Array.new(HEIGHT) do |y|
         if x == 0 || x == WIDTH-1 || y==0 || y == HEIGHT-1
@@ -37,7 +39,7 @@ class Level
   def process_radiation!
     @radiation += 1
     if @radiation >= @max_radiation
-      @player.get_hit(1)
+      @player.get_hit(1, @player)
     end
   end
 

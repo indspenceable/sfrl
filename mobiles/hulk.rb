@@ -21,8 +21,8 @@ class Hulk < MonsterBase
     move_towards_player(level, player) if level.lit?(x, y)
   end
 
-  def attack(monster)
-    super(monster)
+  def attack_message
+    "hulk smash"
   end
 
   def describe

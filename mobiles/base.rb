@@ -14,17 +14,18 @@ class MonsterBase
     @location = tile
   end
 
-  def get_hit(damage)
+  def get_hit(damage, player)
     @hp -= damage
-    die! if @hp <= 0
+    die!(player) if @hp <= 0
   end
 
   def power
     1
   end
 
-  def attack(monster)
-    monster.get_hit(power)
+  def attack(player)
+    player.message!(attack_message)
+    player.get_hit(power, player)
   end
 
   def x
@@ -39,7 +40,8 @@ class MonsterBase
     move!(tile)
   end
 
-  def die!
+  def die!(player)
+    player.message!("The #{self.class.name} dies.")
     @location.monster = nil
   end
 

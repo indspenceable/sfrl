@@ -21,9 +21,13 @@ class Bloat< MonsterBase
     move_towards_player(level, player) if level.lit?(x, y)
   end
 
-  def attack(monster)
-    super(monster)
-    die!
+  def attack(player)
+    super(player)
+    die!(player)
+  end
+
+  def attack_message
+    "The bloat explodes in a shower of corrosive acid!"
   end
 
   def describe
