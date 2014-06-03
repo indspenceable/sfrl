@@ -38,7 +38,10 @@ class Tile
 
   def self.random_monster(tile)
     [
-      Mutant,
+      # Mutant,
+      # FungalWall,
+      # Bloat,
+      SpreadingSpore,
     ].shuffle.pop.new(tile)
   end
 
@@ -442,65 +445,6 @@ end
 # end
 # exit
 
-class Player
-  attr_accessor :energy, :cooldown, :location
-  attr_reader :hp
-  def initialize(tile)
-    @location = tile
-    tile.monster = self
-    @energy = 3
-    @cooldown = 0
-    @hp = 7
-  end
-
-  def heal!(x)
-    @hp += x
-    @hp = 10 if @hp>10
-    @hp
-  end
-
-  def move!(tile)
-    if @location
-      @location.monster = nil
-    end
-    tile.monster = self
-    @location = tile
-  end
-
-  def movement!(tile)
-    move!(tile)
-    @cooldown += 1
-  end
-
-  def x
-    @location.x
-  end
-  def y
-    @location.y
-  end
-  def chr
-    '@'
-  end
-
-  def attack(monster)
-    monster.hit(1)
-  end
-
-  def color
-    'white'
-  end
-
-  def item(slot)
-    @items ||= {}
-    @items[slot]
-  end
-
-  def equip(slot, item)
-    @items ||= {}
-    @items[slot] = item
-  end
-end
-
 class GameMode
   def draw_title
     Curses::setpos(0,0)
@@ -562,7 +506,11 @@ end
 require './equipment/phaser'
 require './equipment/boots'
 require './equipment/life_support'
-require './enemies/mutant'
+require './mobiles/base'
+require './mobiles/mutant'
+require './mobiles/fungal_wall'
+require './mobiles/bloat'
+require './mobiles/player'
 
 class MainGame < GameMode
   def initialize
@@ -590,7 +538,7 @@ class MainGame < GameMode
 
   def idle!
     monsters.each do |m|
-      m.move!
+      m.act!(@level, @player)
     end
     @player.cooldown -= 1
     self
@@ -628,7 +576,6 @@ class MainGame < GameMode
       @player.movement!(tile)
     elsif tile.monster
       @player.attack(tile.monster)
-      tile.monster.die! if tile.monster.hp <= 0
     else
       tile.bump!(@player)
     end
@@ -653,14 +600,16 @@ begin
   # COLOR_ATTRS['black'] = Curses::A_BOLD
   Curses::init_pair(c('yellow'),Curses::COLOR_YELLOW,Curses::COLOR_BLACK)
   # COLOR_ATTRS['yellow'] = Curses::A_BOLD
+  Curses::init_pair(c('magenta'),Curses::COLOR_MAGENTA,Curses::COLOR_BLACK)
 
   current_action = m
   Curses::curs_set(0)
 
   loop do
+    Curses::clear
     current_action.draw
-    current_action = current_action.idle! if current_action.should_idle?
     current_action = current_action.process_input!(Curses::getch) if current_action.should_process_input?
+    current_action = current_action.idle! if current_action.should_idle?
   end
 ensure
   Curses::close_screen

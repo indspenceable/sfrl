@@ -16,6 +16,7 @@ class BasicLifeSupport
 
   def use(stack, level, player)
     if player.energy >= cost
+      old_energy = player.energy
       player.energy -= cost
       player.heal!(life_recovery)
       player.cooldown += cooldown

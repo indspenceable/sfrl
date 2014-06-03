@@ -3,7 +3,8 @@ class BootsValidator
     @boots = boots
     @player = player
   end
-  def valid?(target)
+  def valid?(level, target)
+    level.lit?(target.x, target.y) &&
     target.monster.nil? &&
     target.distance_to(@player.location) <= @boots.max_distance &&
     target.can_move_into?

@@ -2,8 +2,10 @@ class PhaserValidator
   def initialize(phaser)
     @phaser = phaser
   end
-  def valid?(target)
-    target.monster && !target.monster.is_a?(Player)
+  def valid?(level, target)
+    level.lit?(target.x, target.y) &&
+    target.monster &&
+    !target.monster.is_a?(Player)
   end
   def continue(prev, player, target)
     @phaser.fire!(prev, player, target.monster)
@@ -29,8 +31,7 @@ class BasicPhaser
 
   def fire!(prev, player, target)
     @shots-=1
-    target.hit(2)
-    target.die! if target.hp <= 0
+    target.get_hit(2)
     player.cooldown += 1
     return prev
   end
@@ -69,7 +70,7 @@ class TargetSelector < GameMode
 
   def draw_x_at(x,y)
     Curses::setpos(y, x)
-    if @level.lit?(x, y)
+    if @delegate.valid?(@level, @level.map[@x][@y])
       draw_str("X",'red')
     else
       draw_str("X",'blue')
@@ -89,7 +90,7 @@ class TargetSelector < GameMode
     when 'q'
       return @prev
     when ' '
-      if @delegate.valid?(@level.map[@x][@y]) && @level.lit?(@x, @y)
+      if @delegate.valid?(@level, @level.map[@x][@y])
         return @delegate.continue(@prev, @player, @level.map[@x][@y])
       end
     end
