@@ -51,7 +51,7 @@ class SpreadingSpore < MonsterBase
   def act!(level, _player)
     return unless (@seen ||= level.lit?(x, y))
     @spread_cooldown += 1
-    if @spread_cooldown >= 7
+    if @spread_cooldown >= 12
       new_tile = [
         level.at(x+1, y),
         level.at(x-1, y),

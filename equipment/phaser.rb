@@ -56,21 +56,29 @@ class TargetSelector < GameMode
     true
   end
 
-  def title
-    @delegate.title
+  def caption
+    if currently_valid?
+      ""
+    else
+      "invalid"
+    end
   end
 
   def draw
-    draw_title
-    draw_map(0,1)
-    draw_x_at(@x,@y+1)
+    draw_map(0,0)
+    draw_x_at(@x,@y)
+    draw_caption(0,24)
     draw_status(WIDTH+1,0)
     Curses::refresh
   end
 
+  def currently_valid?
+    @delegate.valid?(@level, @level.map[@x][@y])
+  end
+
   def draw_x_at(x,y)
     Curses::setpos(y, x)
-    if @delegate.valid?(@level, @level.map[@x][@y])
+    if currently_valid?
       draw_str("X",'red')
     else
       draw_str("X",'blue')
@@ -90,10 +98,48 @@ class TargetSelector < GameMode
     when 'q'
       return @prev
     when ' '
-      if @delegate.valid?(@level, @level.map[@x][@y])
+      if currently_valid?
         return @delegate.continue(@prev, @player, @level.map[@x][@y])
       end
     end
+    self
+  end
+end
+
+
+class Equip < GameMode
+  def initialize(stack, level, player)
+    @prev = stack
+    @level = level
+    @player = player
+  end
+  def should_idle?
+    false
+  end
+  def should_process_input?
+    true
+  end
+
+  def caption
+    "Select what slot to equip #{@player.location.item.pretty}"
+  end
+
+  def draw
+    draw_map(0,0)
+    draw_caption(0,24)
+    draw_status(WIDTH+1,0)
+    Curses::refresh
+  end
+
+  def process_input! c
+    if %w(1 2 3 4 5).include?(c)
+      @player.equip(c.to_i, @player.location.item)
+      @player.location.item = nil
+      return @prev
+    elsif c == 'q'
+      return @prev
+    end
+
     self
   end
 end

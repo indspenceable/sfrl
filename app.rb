@@ -20,7 +20,7 @@ HEIGHT = 24
 class Tile
   def self.build(x, y, c)
     case c
-    when '*'
+    when '~'
       t = Tile.new(x, y, '.')
       t.item = random_item(t)
       t
@@ -33,7 +33,11 @@ class Tile
     end
   end
   def self.random_item(tile)
-    nil
+    [
+      BasicPhaser,
+      BasicBoots,
+      BasicLifeSupport,
+    ].shuffle.pop.new
   end
 
   def self.random_monster(tile)
@@ -42,7 +46,21 @@ class Tile
       FungalWall,
       Bloat,
       SpreadingSpore,
+      Hulk,
     ].shuffle.pop.new(tile)
+  end
+
+  def activate!(prev, level, player)
+    case
+    when @terrain == '<'
+      prev
+    when @terrain == '>'
+      MainGame.new(player)
+    when @item
+      # item upgrade prompt
+      # prev
+      Equip.new(prev, level, player)
+    end
   end
 
   attr_accessor :terrain, :item, :monster, :x, :y
@@ -56,7 +74,7 @@ class Tile
     if monster
       monster.chr
     elsif item
-      item.chr
+      '~'
     else
       terrain
     end
@@ -66,28 +84,41 @@ class Tile
     if monster
       monster.color
     elsif item
-      item.color
+      'bright_blue'
     else
       {
         '#' => 'blue',
-        '[' => 'bright_yellow',
+        'E' => 'bright_yellow',
+        '~' => 'bright_blue'
       }[terrain] || 'white'
     end
   end
 
+  def caption
+    if @item
+      "You see: #{@item.pretty}."
+    elsif @terrain == '>'
+      "there is a staircase down here."
+    elsif @terrain == '<'
+      "there is a staircase up here."
+    else
+      ""
+    end
+  end
+
   def can_move_into?
-    monster.nil? && %w(. <).include?(terrain)
+    monster.nil? && %w(. < >).include?(terrain)
   end
 
   def block_los?
-    %w(# [).include?(terrain)
+    %w(#).include?(terrain)
   end
 
   def bump!(player)
     case terrain
-    when '['
-      player.energy += 1
-      @terrain = '#'
+    when 'E'
+      player.energy = 10
+      @terrain = '.'
     end
   end
 
@@ -272,9 +303,9 @@ end
 require './level'
 
 class GameMode
-  def draw_title
-    Curses::setpos(0,0)
-    draw_str(title, 'white')
+  def draw_caption(x,y)
+    Curses::setpos(y,x)
+    draw_str(caption, 'white')
   end
   def draw_map(offset_x, offset_y)
     @level.calculate_los(@player.x, @player.y, 5)
@@ -337,22 +368,28 @@ require './mobiles/base'
 require './mobiles/mutant'
 require './mobiles/fungal_wall'
 require './mobiles/bloat'
+require './mobiles/hulk'
 require './mobiles/player'
 
 class MainGame < GameMode
-  def initialize
+  def initialize(pl=nil)
     @level = Level.new
-    @player = Player.new(@level.find_terrain('<'))
-    @player.equip(1, BasicPhaser.new)
-    @player.equip(2, BasicBoots.new)
-    @player.equip(3, BasicLifeSupport.new)
+    pl ||= begin
+      p = Player.new(@level.find_terrain('<'))
+      p.equip(1, BasicPhaser.new)
+      p.equip(2, BasicBoots.new)
+      p.equip(3, BasicLifeSupport.new)
+      p
+    end
+    @player = pl
+    @player.move!(@level.find_terrain('<'))
   end
   def should_process_input?
     !should_idle?
   end
 
-  def title
-    "movement"
+  def caption
+    @player.location.caption
   end
 
   def monsters
@@ -375,9 +412,10 @@ class MainGame < GameMode
     @player.cooldown > 0
   end
   def draw
-    draw_title
-    draw_map(0,1)
-    draw_status(WIDTH+1,0)
+    # draw_title
+    draw_map(0,0)
+    draw_caption(0,24)
+    draw_status(WIDTH+1, 0)
     Curses::refresh
   end
 
@@ -391,6 +429,9 @@ class MainGame < GameMode
       attempt_move(@level.map[@player.x][@player.y-1])
     when 'l'
       attempt_move(@level.map[@player.x+1][@player.y])
+    when 'a'
+      rtn = @player.location.activate!(self, @level, @player)
+      return rtn if rtn
     else
       if %w(1 2 3 4 5).include?(c)
         return @player.item(c.to_i).use(self, @level, @player) if @player.item(c.to_i)

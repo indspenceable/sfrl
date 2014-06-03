@@ -47,12 +47,22 @@ class Level
 
   attr_reader :map
 
+  VAULT_COUNT_GOAL = 30
+  VAULT_COUNT_MINIMUM = 25
+
+  def start_x
+    @sx||=rand(WIDTH-10)+5
+  end
+  def start_y
+    @sy||=rand(HEIGHT-10)+5
+  end
+
   def build
     starting_vault = Vault.start.shuffle.pop.variations.shuffle.pop
-    place_vault!([10,10], starting_vault)
+    place_vault!([start_x,start_y], starting_vault)
     placed_vaults = 0
     failures_in_this_sequence = 0
-    while placed_vaults < 10 && failures_in_this_sequence < 1000
+    while placed_vaults < VAULT_COUNT_GOAL && failures_in_this_sequence < 1000
 
       # puts "looking at map:"
       # map.each do |row|
@@ -92,15 +102,54 @@ class Level
       end
     end
     # puts "placed #{placed_vaults} vaults"
-
-    fill_in_empty_space
+    raise "building failed" if placed_vaults < VAULT_COUNT_MINIMUM
+    add_exit
+    place_monsters_and_treasure
+    fill_in_empty_space_and_build_tiles!
   end
 
-  def fill_in_empty_space
+  def add_exit
+    ex,ey = open_spaces.shuffle.map do |s|
+      [s, (start_x-s.first).abs + (start_y-s.last).abs]
+    end.select{|(_a,_b),c| c > 15}.sort_by(&:last).last(30).shuffle.pop.first
+    @map[ex][ey] = '>'
+  end
+
+  def place_monsters_and_treasure
+    standalone_enemies_to_place = 5
+    treasures = 3.times.map do |i|
+      # choose a treasure
+      treasure = if i == 0
+        'E'
+      else
+        # gear of some sort.
+        '~'
+      end
+      treasure
+    end
+
+    tiles = []
+    WIDTH.times do |x|
+      HEIGHT.times do |y|
+        tiles << [x,y] if @map[x][y] == '.' && (start_x-x).abs + (start_y-y).abs > 10
+      end
+    end
+
+    15.times do
+      tiles.shuffle!
+      a,b = tiles.pop
+      @map[a][b] = 'x'
+    end
+    treasures.each do |t|
+      a,b = tiles.pop
+      @map[a][b] = t
+    end
+  end
+
+  def fill_in_empty_space_and_build_tiles!
     WIDTH.times do |x|
       HEIGHT.times do |y|
         @map[x][y] = '#' if map[x][y] == '?'
-        # @map[x][y] = '.' if map[x][y] == '*'
         @map[x][y] = '.' if map[x][y] == '.'
 
         @map[x][y] = Tile.build(x, y, @map[x][y])
@@ -134,7 +183,7 @@ class Level
       vault.height.times do |h|
         next if (lazy_tiles + ['$']).include?(vault.map[w][h])
         return false if off_map?(x+w,y+h)
-        return false unless lazy_tiles.include?(@map[x+w][y+h])
+        return false unless lazy_tiles.include?(@map[x+w][y+h]) || @map[x+w][y+h] == vault.map[w][h]
       end
     end
     return true
