@@ -64,4 +64,8 @@ class SpreadingSpore < MonsterBase
       @spread_cooldown = 0
     end
   end
+
+  def describe
+    "once awoken, these nasty spores will spread until they cover this entire level of the ship."
+  end
 end

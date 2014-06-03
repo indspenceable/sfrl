@@ -3,15 +3,15 @@ class BasicLifeSupport
   end
 
   def cost
-    2
-  end
-
-  def life_recovery
     1
   end
 
+  def life_recovery
+    7
+  end
+
   def cooldown
-    3
+    5
   end
 
   def use(stack, level, player)
