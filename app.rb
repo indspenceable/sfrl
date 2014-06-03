@@ -3,6 +3,7 @@ require 'pry'
 require 'pry-debugger'
 require './permissive_fov'
 require 'set'
+
 COLOR_IDS = {}
 def c(i)
   COLOR_IDS[i] ||= begin
@@ -14,7 +15,7 @@ COLOR_ATTRS = {
 }
 
 WIDTH = 40
-HEIGHT = 40
+HEIGHT = 24
 
 class Tile
   def self.build(x, y, c)
@@ -85,6 +86,10 @@ class Tile
       player.energy += 1
       @terrain = '#'
     end
+  end
+
+  def distance_to(tile)
+    (x-tile.x).abs + (y-tile.y).abs
   end
 end
 
@@ -283,7 +288,7 @@ class Level
   end
   def light(x,y)
     @lit_spaces << [x,y]
-    @memories[[x,y]] = @map[x][y].dup
+    @memories[[x,y]] = @map[x][y].chr
   end
   def lit?(x,y)
     @lit_spaces.include?([x,y])
@@ -438,12 +443,22 @@ end
 # exit
 
 class Player
+  attr_accessor :energy, :cooldown, :location
+  attr_reader :hp
   def initialize(tile)
     @location = tile
     tile.monster = self
     @energy = 3
     @cooldown = 0
+    @hp = 7
   end
+
+  def heal!(x)
+    @hp += x
+    @hp = 10 if @hp>10
+    @hp
+  end
+
   def move!(tile)
     if @location
       @location.monster = nil
@@ -471,20 +486,26 @@ class Player
     monster.hit(1)
   end
 
-  attr_accessor :energy, :cooldown
-
-  [1,2,3].each do |i|
-    define_method("item#{i}") do
-      nil
-    end
-  end
-
   def color
     'white'
+  end
+
+  def item(slot)
+    @items ||= {}
+    @items[slot]
+  end
+
+  def equip(slot, item)
+    @items ||= {}
+    @items[slot] = item
   end
 end
 
 class GameMode
+  def draw_title
+    Curses::setpos(0,0)
+    draw_str(title, 'white')
+  end
   def draw_map(offset_x, offset_y)
     @level.calculate_los(@player.x, @player.y, 5)
     WIDTH.times do |x|
@@ -493,7 +514,7 @@ class GameMode
         if @level.lit?(x,y)
           draw_str(@level.map[x][y].chr, @level.map[x][y].color)
         elsif @level.memory(x,y)
-          draw_str(@level.memory(x,y).chr, 'bright_blackblack')
+          draw_str(@level.memory(x,y), 'bright_blackblack')
         else
           draw_str(" ", 'white')
         end
@@ -503,18 +524,20 @@ class GameMode
   def draw_status(offset_x, offset_y)
     [
       "Commando",
-      "hp: 10/10",
+      "hp: #{@player.hp}/10",
       "",
       "*"*@player.energy,
       "",
-      @player.item1,
-      @player.item2,
-      @player.item3,
-      '',
-      '',
+      *([1,2,3,4,5].map do |i|
+        if @player.item(i)
+          "#{i}): #{@player.item(i).pretty}"
+        else
+          "#{i}): unequipped"
+        end
+      end),
       '',
       'hjkl: move',
-      '123: use item',
+      '12345: use item',
     ].each_with_index do |(str, color),i|
       Curses::setpos(i+offset_y,offset_x)
       draw_str(str,color||'white')
@@ -525,10 +548,10 @@ class GameMode
     # binding.pry unless color
     *attrs, color = color_str.split('_')
     curses_attrs = 0
+
     attrs.each do |a|
       curses_attrs |= COLOR_ATTRS[a]
     end
-
 
     Curses::attron(Curses::color_pair(c(color)) | curses_attrs | Curses::A_NORMAL) do
       Curses::addstr(str||"")
@@ -536,92 +559,25 @@ class GameMode
   end
 end
 
-class Phaser < GameMode
-  def initialize stack, level, player
-    @prev = stack
-    @level = level
-    @player = player
-    @x, @y = player.x, player.y
-  end
-  def should_idle?
-    false
-  end
-  def should_process_input?
-    true
-  end
-
-  def draw
-    draw_map(0,0)
-    Curses::setpos(@y,@x)
-    if @level.lit?(@x, @y)
-      draw_str("X",'red')
-    else
-      draw_str("X",'blue')
-    end
-    draw_status(WIDTH+1,0)
-    Curses::refresh
-  end
-
-  def process_input! c
-    case c
-    when 'h'
-      @x-=1
-    when 'j'
-      @y+=1
-    when 'k'
-      @y-=1
-    when 'l'
-      @x+=1
-    when 13.chr
-    end
-    self
-  end
-end
-
-class Mutant
-  attr_accessor :hp
-
-  def initialize(tile)
-    @location = tile
-    tile.monster = self
-    @hp = 2
-    @regen_cooldown = 0
-  end
-
-  def chr
-    if @hp >=2
-      '8'
-    else
-      'o'
-    end
-  end
-
-  def color
-    'bright_green'
-  end
-
-  def hit(a)
-    @hp -= 1
-    @regen_cooldown = 0
-  end
-
-  def move!
-    @regen_cooldown += 1
-    @hp = 2 if @regen_cooldown == 3
-  end
-
-  def die!
-    @location.monster = nil
-  end
-end
+require './equipment/phaser'
+require './equipment/boots'
+require './equipment/life_support'
+require './enemies/mutant'
 
 class MainGame < GameMode
   def initialize
     @level = Level.new
     @player = Player.new(@level.find_terrain('<'))
+    @player.equip(1, BasicPhaser.new)
+    @player.equip(2, BasicBoots.new)
+    @player.equip(3, BasicLifeSupport.new)
   end
   def should_process_input?
     !should_idle?
+  end
+
+  def title
+    "movement"
   end
 
   def monsters
@@ -643,7 +599,8 @@ class MainGame < GameMode
     @player.cooldown > 0
   end
   def draw
-    draw_map(0,0)
+    draw_title
+    draw_map(0,1)
     draw_status(WIDTH+1,0)
     Curses::refresh
   end
@@ -658,8 +615,10 @@ class MainGame < GameMode
       attempt_move(@level.map[@player.x][@player.y-1])
     when 'l'
       attempt_move(@level.map[@player.x+1][@player.y])
-    when '1'
-      return Phaser.new(self, @level, @player)
+    else
+      if %w(1 2 3 4 5).include?(c)
+        return @player.item(c.to_i).use(self, @level, @player) if @player.item(c.to_i)
+      end
     end
     self
   end
