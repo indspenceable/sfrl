@@ -368,6 +368,7 @@ end
 require './equipment/phaser'
 require './equipment/boots'
 require './equipment/life_support'
+require './equipment/fungal_spawner'
 require './mobiles/base'
 require './mobiles/mutant'
 require './mobiles/fungal_wall'
@@ -386,6 +387,7 @@ class MainGame < GameMode
       p.equip(1, BasicPhaser.new)
       p.equip(2, BasicBoots.new)
       p.equip(3, BasicLifeSupport.new)
+      p.equip(4, FungalSpawner.new)
       p
     end
     @player = pl
@@ -408,7 +410,7 @@ class MainGame < GameMode
   end
 
   def idle!
-    @level.process_radiation!
+    @level.process_radiation!(@player)
     monsters.each do |m|
       m.act!(@level, @player)
     end

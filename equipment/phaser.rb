@@ -7,7 +7,7 @@ class PhaserValidator
     target.monster &&
     !target.monster.is_a?(Player)
   end
-  def continue(prev, player, target)
+  def continue(prev, player, level, target)
     @phaser.fire!(prev, player, target.monster)
   end
   def title
@@ -100,7 +100,7 @@ class TargetSelector < GameMode
       return @prev
     when ' '
       if currently_valid?
-        return @delegate.continue(@prev, @player, @level.map[@x][@y])
+        return @delegate.continue(@prev, @player, @level, @level.map[@x][@y])
       end
     end
     self

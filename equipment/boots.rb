@@ -9,7 +9,7 @@ class BootsValidator
     target.distance_to(@player.location) <= @boots.max_distance &&
     target.can_move_into?
   end
-  def continue(prev, player, target)
+  def continue(prev, player, level, target)
     @boots.jump!(prev, @player, target)
   end
   def title
@@ -32,6 +32,8 @@ class BasicBoots
   def use(stack, level, player)
     if player.energy >= cost
       TargetSelector.new(stack, level, player, BootsValidator.new(self, player))
+    else
+      stack
     end
   end
 

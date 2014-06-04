@@ -14,6 +14,11 @@ class Player < MonsterBase
     @hp
   end
 
+  def recharge(x)
+    @energy += x
+    @energy = 10 if @energy > 10
+  end
+
   def movement!(tile)
     move!(tile)
     wait(1)

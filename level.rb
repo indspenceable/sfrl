@@ -1,6 +1,7 @@
 class Level
   include PermissiveFieldOfView
   attr_reader :difficulty
+  MAX_DIFFICULTY = 16
   def initialize(difficulty)
     @difficulty = difficulty
     @map = Array.new(WIDTH) do |x|
@@ -14,7 +15,7 @@ class Level
     end
     @memories = {}
     @radiation = 0
-    @max_radiation = 1000
+    @max_radiation = 300 + (200*difficulty)/MAX_DIFFICULTY
     build
   end
 
@@ -36,10 +37,10 @@ class Level
     @memories[[x,y]]
   end
 
-  def process_radiation!
+  def process_radiation!(player)
     @radiation += 1
     if @radiation >= @max_radiation
-      @player.get_hit(1, @player)
+      player.get_hit(1, player)
     end
   end
 
@@ -118,7 +119,6 @@ class Level
   end
 
   def place_monsters_and_treasure
-    standalone_enemies_to_place = 5
     treasures = 3.times.map do |i|
       # choose a treasure
       treasure = if i == 0
@@ -137,10 +137,33 @@ class Level
       end
     end
 
-    15.times do
+    pending_monster_levels = (7 + 2*difficulty)
+
+    while pending_monster_levels > 0
       tiles.shuffle!
       a,b = tiles.pop
-      @map[a][b] = 'x'
+      raise 'derp' unless a && b
+      possibilities = case
+      when difficulty > 14
+        ['x','c','v']
+      when difficulty > 11
+        ['x','c','c','v']
+      when difficulty > 8
+        ['x','x','c','v']
+      when difficulty > 5
+        ['x','c']
+      when difficulty > 2
+        ['x','x','x','c']
+      else
+        ['x']
+      end
+      monster_glyph = 'x'
+      case monster_glyph
+      when 'x'
+        pending_monster_levels -= 1
+      end
+      @map[a][b] = possibilities.shuffle.pop
+
     end
     treasures.each do |t|
       a,b = tiles.pop
