@@ -1,11 +1,12 @@
 class Player < MonsterBase
-  attr_accessor :energy, :cooldown, :location, :messages
+  attr_accessor :energy, :cooldown, :location, :messages, :can_see_scent
   attr_reader :hp, :cooldown
   def initialize(tile)
     super(7, tile)
     @energy = 3
     @cooldown = 0
     @messages = []
+    @can_see_scent = 0
   end
 
   def heal!(x)
@@ -22,6 +23,10 @@ class Player < MonsterBase
   def movement!(tile)
     move!(tile)
     wait(1)
+  end
+
+  def can_see_scent?
+    @can_see_scent > 0
   end
 
   def chr
@@ -50,12 +55,15 @@ class Player < MonsterBase
 
   def wait(x)
     @cooldown += x
+    @can_see_scent -= 1 if @can_see_scent > 0
   end
   def cool(x)
     @cooldown -= x
   end
 
-  def message!(m)
-    messages << m
+  def message!(*ms)
+    ms.each do |m|
+      messages << m
+    end
   end
 end

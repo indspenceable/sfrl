@@ -19,13 +19,14 @@ class Level
     build
   end
 
-  def calculate_los(x,y,r)
+  def calculate_los(c,r=99)
+    @save_memories = c.is_a?(Player)
     @lit_spaces = []
-    do_fov(x,y,r, WIDTH, HEIGHT)
+    do_fov(c.x,c.y,r, WIDTH, HEIGHT)
   end
   def light(x,y)
     @lit_spaces << [x,y]
-    @memories[[x,y]] = @map[x][y].chr
+    @memories[[x,y]] = @map[x][y].chr if @save_memories
   end
   def lit?(x,y)
     @lit_spaces.include?([x,y])
@@ -40,12 +41,43 @@ class Level
   def process_radiation!(player)
     @radiation += 1
     if @radiation >= @max_radiation
-      player.get_hit(1, player)
+      # player.get_hit(1, player)
     end
   end
 
   def radiation_pct
     (@radiation*100)/@max_radiation
+  end
+
+  def process_scent!(player)
+    new_scent_values = Hash.new(0.0)
+    player.location.scent += 200
+    WIDTH.times do |x|
+      HEIGHT.times do |y|
+        unless at(x,y).block_scent? || at(x,y).scent == 0
+          scent_destinations = [] #[at(x,y)]
+          [-1,0,1].each do |dx|
+            [-1,0,1].each do |dy|
+              unless off_map?(x+dx,y+dy)
+                t = at(x+dx,y+dy)
+                scent_destinations << t unless t.block_scent?
+              end
+            end
+          end
+          scent_destinations.each do |t|
+            # now, scent_destinations contains all adjacent open tiles.
+            new_scent_values[t] += at(x,y).scent/scent_destinations.count
+
+            # alternatively, always imagine they spread to adjacent tiles, even if they're not expecting
+            # new_scent_values[t] += at(x,y).scent/9
+          end
+        end
+      end
+    end
+    new_scent_values.each do |t, s|
+      t.scent = s-1.0
+      t.scent = 0 if t.scent < 0
+    end
   end
 
   attr_reader :map
@@ -107,8 +139,10 @@ class Level
     # puts "placed #{placed_vaults} vaults"
     raise "building failed" if placed_vaults < VAULT_COUNT_MINIMUM
     add_exit
+    fill_in_empty_space!
+    clear_out_awkward_diagonals!
     place_monsters_and_treasure
-    fill_in_empty_space_and_build_tiles!
+    build_tiles!
   end
 
   def add_exit
@@ -171,12 +205,50 @@ class Level
     end
   end
 
-  def fill_in_empty_space_and_build_tiles!
+  def fill_in_empty_space!
     WIDTH.times do |x|
       HEIGHT.times do |y|
         @map[x][y] = '#' if map[x][y] == '?'
-        @map[x][y] = '.' if map[x][y] == '.'
+      end
+    end
+  end
 
+  def clear_out_awkward_diagonals!
+    count = nil
+    until count == 0
+      count = 0
+      (WIDTH-1).times do |x|
+        (HEIGHT-1).times do |y|
+          if @map[x][y] == '#' &&
+            @map[x+1][y+1] == '#' &&
+            @map[x+1][y] == '.' &&
+            @map[x][y+1] == '.'
+            if rand(2)==0
+              @map[x][y] = '.'
+            else
+              @map[x+1][y+1] = '.'
+            end
+            count += 1
+          elsif
+            @map[x][y] == '.' &&
+            @map[x+1][y+1] == '.' &&
+            @map[x+1][y] == '#' &&
+            @map[x][y+1] == '#'
+            if rand(2)==0
+              @map[x+1][y] = '.'
+            else
+              @map[x][y+1] = '.'
+            end
+            count += 1
+          end
+        end
+      end
+    end
+  end
+
+  def build_tiles!
+    WIDTH.times do |x|
+      HEIGHT.times do |y|
         @map[x][y] = Tile.build(x, y, @map[x][y])
       end
     end

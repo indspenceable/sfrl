@@ -15,8 +15,8 @@ class Mutant < MonsterBase
   end
 
   def act!(level, player)
-    # only act if we're in line of sight.
-    2.times{ move_towards_player(level, player) if level.lit?(x, y) }
+    return unless awake?(level, player)
+    2.times{ move_towards_player(level, player)  }
   end
 
   def attack_message

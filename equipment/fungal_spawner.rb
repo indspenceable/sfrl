@@ -17,7 +17,7 @@ class FungalValidator
   end
 end
 
-class FungalSpawner
+class FungalSpawner < ItemBase
   def initialize
   end
 
@@ -27,6 +27,10 @@ class FungalSpawner
 
   def max_distance
     5
+  end
+
+  def cooldown
+    1
   end
 
   def use(stack, level, player)
@@ -48,7 +52,7 @@ class FungalSpawner
         [SpreadingSpore, FungalWall].shuffle.pop.new(t)
       end
     end
-    player.wait(1)
+    player.wait(cooldown)
     player.energy -= cost
     prev
   end
@@ -56,4 +60,45 @@ class FungalSpawner
   def pretty
     "Fungal Spawner"
   end
+
+  def item_specific_description
+    [["Range: #{max_distance}", 'white']]
+  end
+end
+
+class ScentEnhancer < ItemBase
+  def initialize
+  end
+
+  def cost
+    1
+  end
+
+  def cooldown
+    1
+  end
+
+  def duration
+    50
+  end
+
+  def use(stack, level, player)
+    if player.energy >= cost
+      player.can_see_scent += 50
+      player.wait(cooldown)
+      player.energy -= cost
+      stack
+    else
+      stack
+    end
+  end
+
+  def pretty
+    "Scent Enhancer"
+  end
+
+  def item_specific_description
+    [["Duration: #{duration}", 'white']]
+  end
+
 end

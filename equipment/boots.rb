@@ -17,8 +17,12 @@ class BootsValidator
   end
 end
 
-class BasicBoots
+class BasicBoots < ItemBase
   def initialize
+  end
+
+  def cooldown
+    1
   end
 
   def cost
@@ -40,11 +44,16 @@ class BasicBoots
   def jump!(prev, player, target)
     player.energy -= cost
     player.move!(target)
-    player.wait(1)
+    player.wait(cooldown)
     prev
   end
 
   def pretty
     "jump boots"
   end
+
+  def item_specific_description
+    [["Range: #{max_distance}", 'white']]
+  end
+
 end

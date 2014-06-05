@@ -46,6 +46,7 @@ class Tile
       FungalWall,
       Bloat,
       SpreadingSpore,
+      SmellySpore,
       Hulk,
     ].shuffle.pop.new(tile)
   end
@@ -58,6 +59,13 @@ class Tile
     when @terrain == '>'
       player.message!("you walk down the stairs")
       MainGame.new(level.difficulty+1, player)
+    when @terrain == 'E'
+      player.message!("you draw some energy from the",
+                      "outlet, before it goes dark.")
+      player.energy += 3
+      @terrain = '.'
+      player.wait(1)
+      prev
     when @item
       # item upgrade prompt
       # prev
@@ -65,12 +73,13 @@ class Tile
     end
   end
 
-  attr_accessor :terrain, :item, :monster, :x, :y
+  attr_accessor :terrain, :item, :monster, :x, :y, :scent
   def initialize x, y, terrain
     @x, @y = x, y
     @terrain = terrain
     @item = nil
     @monster = nil
+    @scent = 0.0
   end
   def chr
     if monster
@@ -82,7 +91,7 @@ class Tile
     end
   end
 
-  def color
+  def color(player)
     if monster
       monster.color
     elsif item
@@ -92,7 +101,46 @@ class Tile
         '#' => 'blue',
         'E' => 'bright_yellow',
         '~' => 'bright_blue'
-      }[terrain] || 'white'
+      }[terrain] || color_by_scent(player)
+    end
+  end
+
+  def color_by_scent(player)
+
+    if player.can_see_scent?
+      case
+      when scent > 140
+        'bright_magenta'
+      when scent > 120
+        'magenta'
+      when scent > 100
+        'bright_red'
+      when scent > 80
+        'red'
+      when scent > 60
+        'bright_green'
+      when scent > 40
+        'green'
+      when scent > 20
+        'bright_blue'
+      when scent > 10
+        'blue'
+      else
+        'white'
+      end
+    else
+      if distance_to(player.location) <= 2
+        case
+        when scent > 150
+          'bright_magenta'
+        when scent > 100
+          'magenta'
+        else
+          'white'
+        end
+      else
+        'white'
+      end
     end
   end
 
@@ -109,7 +157,11 @@ class Tile
   end
 
   def can_move_into?
-    monster.nil? && %w(. < >).include?(terrain)
+    monster.nil? && %w(. < > E).include?(terrain)
+  end
+
+  def block_scent?
+    %w(#).include?(terrain)
   end
 
   def block_los?
@@ -117,11 +169,11 @@ class Tile
   end
 
   def bump!(player)
-    case terrain
-    when 'E'
-      player.energy = 10
-      @terrain = '.'
-    end
+    # case terrain
+    # when 'E'
+    #   player.energy = 10
+    #   @terrain = '.'
+    # end
   end
 
   def distance_to(tile)
@@ -310,18 +362,46 @@ class GameMode
     draw_str(caption, 'white')
   end
   def draw_map(offset_x, offset_y)
-    @level.calculate_los(@player.x, @player.y, 5)
+    @level.calculate_los(@player)
     WIDTH.times do |x|
       HEIGHT.times do |y|
         Curses::setpos(y+offset_y,x+offset_x)
         if @level.lit?(x,y)
-          draw_str(@level.map[x][y].chr, @level.map[x][y].color)
+          draw_str(@level.map[x][y].chr, @level.map[x][y].color(@player))
         elsif @level.memory(x,y)
           draw_str(@level.memory(x,y), 'bright_blackblack')
         else
           draw_str(" ", 'white')
         end
       end
+    end
+  end
+
+  def draw_message(lines, min_width=0)
+    number_of_lines = lines.count+1
+    # number_of_lines += 1 if number_of_lines.?
+    box_width = lines.map(&:first).map(&:length).max+2
+    box_width = min_width if box_width < min_width
+
+    y_border = (HEIGHT - number_of_lines)/2
+    y_border_bottom = y_border
+    y_border_bottom -= 1 if lines.count.odd?
+    x_border = (WIDTH  - box_width)/2
+
+    (WIDTH-(2*x_border)).times do |x_|
+      (HEIGHT-(y_border+y_border_bottom)).times do |y_|
+        Curses::setpos(y_border + y_, x_border + x_)
+        if x_ == 0 || x_ == WIDTH-(x_border*2)-1 || y_ == 0 || y_ == HEIGHT-(y_border+y_border_bottom)-1
+          draw_str('*', 'white')
+        else
+          draw_str(' ', 'white')
+        end
+      end
+    end
+
+    lines.each_with_index do |(l, color),i|
+      Curses::setpos(y_border + i + 1, x_border + 1)
+      draw_str(l, color)
     end
   end
   def draw_status(offset_x, offset_y)
@@ -365,6 +445,7 @@ class GameMode
   end
 end
 
+require './equipment/item_base'
 require './equipment/phaser'
 require './equipment/boots'
 require './equipment/life_support'
@@ -385,9 +466,10 @@ class MainGame < GameMode
     pl ||= begin
       p = Player.new(@level.find_terrain('<'))
       p.equip(1, BasicPhaser.new)
-      p.equip(2, BasicBoots.new)
-      p.equip(3, BasicLifeSupport.new)
-      p.equip(4, FungalSpawner.new)
+      # p.equip(2, BasicBoots.new)
+      # p.equip(3, BasicLifeSupport.new)
+      # p.equip(4, FungalSpawner.new)
+      # p.equip(5, ScentEnhancer.new)
       p
     end
     @player = pl
@@ -411,7 +493,10 @@ class MainGame < GameMode
 
   def idle!
     @level.process_radiation!(@player)
+    @level.process_scent!(@player)
+
     monsters.each do |m|
+      @level.calculate_los(m)
       m.act!(@level, @player)
     end
     @player.cool(1)
@@ -429,6 +514,7 @@ class MainGame < GameMode
   end
 
   def process_input! c
+    @level.calculate_los(@player)
     case c
     when 'h'
       attempt_move(@level.map[@player.x-1][@player.y])
@@ -438,6 +524,12 @@ class MainGame < GameMode
       attempt_move(@level.map[@player.x][@player.y-1])
     when 'l'
       attempt_move(@level.map[@player.x+1][@player.y])
+    when '.'
+      @player.wait(1)
+    when 'd'
+      return DescribeMode.new(self, @level, @player)
+    when '?'
+      # TODO - info mode.
     when 'a'
       rtn = @player.location.activate!(self, @level, @player)
       return rtn if rtn
@@ -456,6 +548,92 @@ class MainGame < GameMode
       @player.attack(tile.monster)
     else
       tile.bump!(@player)
+    end
+  end
+end
+
+class MessageWindow < GameMode
+  def initialize(stack, level, player, message)
+    @prev, @level, @player, @message = stack, level, player, message
+  end
+
+  def draw
+    draw_map(0,0)
+    draw_caption(0,24)
+    draw_status(WIDTH+1, 0)
+    draw_message(@message)
+    Curses::refresh
+  end
+
+  def should_idle?
+    false
+  end
+
+  def should_process_input?
+    true
+  end
+
+  def process_input! c
+    @prev
+  end
+
+  def caption
+    ""
+  end
+end
+
+class DescribeMode < GameMode
+  def initialize(stack, level, player)
+    @prev, @level, @player = stack, level, player
+  end
+  def draw
+    draw_map(0,0)
+    draw_caption(0,24)
+    draw_status(WIDTH+1, 0)
+    draw_message(prompt)
+    Curses::refresh
+  end
+
+  def caption
+    "describe what?"
+  end
+
+  def prompt
+    things_to_describe = []
+    %w(1 2 3 4 5).each do |i|
+      if @player.item(i.to_i)
+        things_to_describe << "#{i}) #{@player.item(i.to_i).pretty}"
+      end
+    end
+    if @player.location.item
+      ".) #{@player.location.item.pretty}"
+    end
+    if things_to_describe.any?
+      ["Describe what?"] + things_to_describe
+    else
+      ["Nothing to describe."]
+    end.map do |l|
+      [l, 'white']
+    end
+  end
+
+  def should_idle?
+    false
+  end
+  def should_process_input?
+    true
+  end
+
+  def process_input! c
+    if %w(1 2 3 4 5).include?(c)
+      if @player.item(c.to_i)
+        return MessageWindow.new(self, @level, @player, @player.item(c.to_i).long_description)
+      end
+      self
+    elsif c == '.' && @player.location.item
+      return MessageWindow.new(self, @level, @player, @player.location.item.long_description)
+    elsif c == 'q'
+      return @prev
     end
   end
 end

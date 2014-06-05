@@ -18,16 +18,20 @@ class Bloat< MonsterBase
   end
 
   def act!(level, player)
-    move_towards_player(level, player) if level.lit?(x, y)
+    return unless awake?(level, player)
+    move_towards_player(level, player)
+    if location.distance_to(player.location) == 1
+      attack(player)
+    end
   end
 
   def attack(player)
-    super(player)
+    player.message!(*attack_message)
     die!(player)
   end
 
   def attack_message
-    "The bloat explodes in a shower of corrosive acid!"
+    ["The bloat explodes in ","a shower of corrosive acid!"]
   end
 
   def describe

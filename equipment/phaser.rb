@@ -1,11 +1,13 @@
 class PhaserValidator
-  def initialize(phaser)
+  def initialize(phaser, player)
     @phaser = phaser
+    @player = player
   end
   def valid?(level, target)
     level.lit?(target.x, target.y) &&
     target.monster &&
-    !target.monster.is_a?(Player)
+    !target.monster.is_a?(Player) &&
+    target.distance_to(@player) <= @phaser.max_distance
   end
   def continue(prev, player, level, target)
     @phaser.fire!(prev, player, target.monster)
@@ -15,15 +17,31 @@ class PhaserValidator
   end
 end
 
-class BasicPhaser
+class BasicPhaser < ItemBase
   attr_reader :shots
   def initialize
     @shots = 10
   end
 
+  def max_distance
+    20
+  end
+
+  def cooldown
+    1
+  end
+
+  def cost
+    1
+  end
+
+  def damage
+    2
+  end
+
   def use(stack, level, player)
     if @shots > 0
-      TargetSelector.new(stack, level, player, PhaserValidator.new(self))
+      TargetSelector.new(stack, level, player, PhaserValidator.new(self, player))
     else
       stack
     end
@@ -32,13 +50,21 @@ class BasicPhaser
   def fire!(prev, player, target)
     @shots-=1
     player.message!("You shoot the #{target.class.name}")
-    target.get_hit(2, player)
-    player.wait(1)
+    target.get_hit(damage, player)
+    player.wait(cooldown)
     return prev
   end
 
   def pretty
     "phaser (shots: #{@shots})"
+  end
+
+  def item_specific_description
+    [
+      ["Range: #{max_distance}", 'white'],
+      ["Damage: #{damage}", 'white'],
+      ["Shots: #{@shots}", 'white']
+    ]
   end
 end
 

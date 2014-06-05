@@ -18,7 +18,8 @@ class Hulk < MonsterBase
   end
 
   def act!(level, player)
-    move_towards_player(level, player) if level.lit?(x, y)
+    return unless awake?(level, player)
+    move_towards_player(level, player)
   end
 
   def attack_message

@@ -1,4 +1,4 @@
-class BasicLifeSupport
+class BasicLifeSupport < ItemBase
   def initialize
   end
 
@@ -28,5 +28,9 @@ class BasicLifeSupport
 
   def pretty
     "basic life support"
+  end
+
+  def item_specific_description
+    []
   end
 end
