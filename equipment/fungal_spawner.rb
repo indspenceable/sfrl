@@ -13,24 +13,17 @@ class FungalValidator
     @phaser.fire!(prev, @player, level, target)
   end
   def title
-    "Jump destination"
+    "spawn where"
   end
 end
 
 class FungalSpawner < ItemBase
+  attr_reader :cost, :max_distance, :cooldown, :install_cost
   def initialize
-  end
-
-  def cost
-    3
-  end
-
-  def max_distance
-    5
-  end
-
-  def cooldown
-    1
+    @cost = rand(2)+1
+    @max_distance = rand(3) + 3
+    @cooldown = rand(2) + 1
+    @install_cost = rand(5)+1
   end
 
   def use(stack, level, player)
@@ -64,41 +57,4 @@ class FungalSpawner < ItemBase
   def item_specific_description
     [["Range: #{max_distance}", 'white']]
   end
-end
-
-class ScentEnhancer < ItemBase
-  def initialize
-  end
-
-  def cost
-    1
-  end
-
-  def cooldown
-    1
-  end
-
-  def duration
-    50
-  end
-
-  def use(stack, level, player)
-    if player.energy >= cost
-      player.can_see_scent += 50
-      player.wait(cooldown)
-      player.energy -= cost
-      stack
-    else
-      stack
-    end
-  end
-
-  def pretty
-    "Scent Enhancer"
-  end
-
-  def item_specific_description
-    [["Duration: #{duration}", 'white']]
-  end
-
 end

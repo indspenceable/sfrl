@@ -3,7 +3,7 @@ class BasicLifeSupport < ItemBase
   end
 
   def cost
-    1
+    2
   end
 
   def life_recovery
@@ -11,7 +11,11 @@ class BasicLifeSupport < ItemBase
   end
 
   def cooldown
-    5
+    3
+  end
+
+  def install_cost
+    1
   end
 
   def use(stack, level, player)

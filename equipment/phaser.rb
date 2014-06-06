@@ -35,8 +35,12 @@ class BasicPhaser < ItemBase
     1
   end
 
+  def install_cost
+    3
+  end
+
   def damage
-    2
+    3
   end
 
   def use(stack, level, player)

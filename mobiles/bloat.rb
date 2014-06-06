@@ -27,6 +27,7 @@ class Bloat< MonsterBase
 
   def attack(player)
     player.message!(*attack_message)
+    player.get_hit(5, player)
     die!(player)
   end
 

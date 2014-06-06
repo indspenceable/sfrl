@@ -2,7 +2,7 @@ class Mutant < MonsterBase
   attr_accessor :hp
 
   def initialize(tile)
-    super(1, tile)
+    super(rand(3), tile)
     @regen_cooldown = 0
   end
 

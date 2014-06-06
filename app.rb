@@ -37,6 +37,9 @@ class Tile
       BasicPhaser,
       BasicBoots,
       BasicLifeSupport,
+      FungalSpawner,
+      ScentEnhancer,
+      PowerDrill,
     ].shuffle.pop.new
   end
 
@@ -60,9 +63,11 @@ class Tile
       player.message!("you walk down the stairs")
       MainGame.new(level.difficulty+1, player)
     when @terrain == 'E'
-      player.message!("you draw some energy from the",
+      energy_gain = rand(5)-1
+      energy_gain = 1 if energy_gain < 1
+      player.message!("you draw some energy (#{energy_gain}) from the",
                       "outlet, before it goes dark.")
-      player.energy += 3
+      player.energy += energy_gain
       @terrain = '.'
       player.wait(1)
       prev
@@ -108,23 +113,26 @@ class Tile
   def color_by_scent(player)
 
     if player.can_see_scent?
+      sms = (100*scent)/Level::MAX_SCENT
       case
-      when scent > 140
+      when sms > 45
         'bright_magenta'
-      when scent > 120
+      when sms > 40
         'magenta'
-      when scent > 100
+      when sms > 35
         'bright_red'
-      when scent > 80
+      when sms > 30
         'red'
-      when scent > 60
+      when sms > 25
         'bright_green'
-      when scent > 40
+      when sms > 20
         'green'
-      when scent > 20
+      when sms > 15
         'bright_blue'
-      when scent > 10
+      when sms > 10
         'blue'
+      when sms > 5
+        'bright_white'
       else
         'white'
       end
@@ -169,11 +177,6 @@ class Tile
   end
 
   def bump!(player)
-    # case terrain
-    # when 'E'
-    #   player.energy = 10
-    #   @terrain = '.'
-    # end
   end
 
   def distance_to(tile)
@@ -409,9 +412,9 @@ class GameMode
       "Commando",
       "hp: #{@player.hp}/10",
       "",
+      "level #{@level.difficulty}",
       "Energy: #{"*"*@player.energy}",
       "Radiation density: #{@level.radiation_pct}%",
-      "",
       *([1,2,3,4,5].map do |i|
         if @player.item(i)
           "#{i}): #{@player.item(i).pretty}"
@@ -450,6 +453,8 @@ require './equipment/phaser'
 require './equipment/boots'
 require './equipment/life_support'
 require './equipment/fungal_spawner'
+require './equipment/drill'
+require './equipment/visors'
 require './mobiles/base'
 require './mobiles/mutant'
 require './mobiles/fungal_wall'
@@ -466,10 +471,10 @@ class MainGame < GameMode
     pl ||= begin
       p = Player.new(@level.find_terrain('<'))
       p.equip(1, BasicPhaser.new)
-      # p.equip(2, BasicBoots.new)
+      p.equip(2, TerrainScanner.new)
       # p.equip(3, BasicLifeSupport.new)
       # p.equip(4, FungalSpawner.new)
-      # p.equip(5, ScentEnhancer.new)
+      p.equip(5, ScentEnhancer.new)
       p
     end
     @player = pl

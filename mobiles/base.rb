@@ -28,12 +28,13 @@ class MonsterBase
   end
 
   def sight_chance
-    5
+    20
   end
 
   def awake?(level, player)
     @awake ||= rand(100) < (100*location.scent/scent_threshold) ||
-      can_see_player?(level, player) && rand(100) < sight_chance
+      can_see_player?(level, player) &&
+      rand(100) > (sight_chance * location.distance_to(player.location)**(0.25))
   end
 
   def can_see_player?(level, player)
@@ -63,7 +64,9 @@ class MonsterBase
   end
 
   def move_towards_player(level, player)
-    if can_see_player?(level, player)
+    if location.distance_to(player) == 1
+      attack(player)
+    elsif can_see_player?(level, player)
       move_towards_seen_player(level, player)
     else
       move_by_scent(level, player)
@@ -71,13 +74,15 @@ class MonsterBase
   end
 
   def move_towards_seen_player(level, player)
-    dx = player.x - location.x
-    dy = player.y - location.y
+    move_towards(level, player)
+  end
+
+  def move_towards(level, obj)
+    dx = obj.x - location.x
+    dy = obj.y - location.y
     ddx = dx == 0 ? 0 : (dx/dx.abs)
     ddy = dy == 0 ? 0 : (dy/dy.abs)
-    if dx.abs + dy.abs == 1
-      attack(player)
-    elsif dx.abs >= dy.abs && level.at(location.x + ddx, location.y).can_move_into?
+    if dx.abs >= dy.abs && level.at(location.x + ddx, location.y).can_move_into?
       move!(level.at(location.x + ddx, location.y))
     elsif level.at(location.x, location.y + ddy).can_move_into?
       move!(level.at(location.x, location.y + ddy))
@@ -87,16 +92,28 @@ class MonsterBase
   end
 
   def move_by_scent(level, player)
-    dest = [
-      level.at(x+1, y),
-      level.at(x-1, y),
-      level.at(x, y-1),
-      level.at(x, y+1),
-    ].select{|t| t.can_move_into?}.sort_by(&:scent).last
-    if dest.monster == player
-      attack(player)
-    else
-      move!(dest)
+    possible_spaces = []
+    WIDTH.times do |w|
+      HEIGHT.times do |h|
+        # TODO this should be "SCENT LOS to."
+        if level.lit?(w, h) && level.at(w,h).can_move_into?
+          possible_spaces << level.at(w,h)
+        end
+      end
     end
+    move_towards(level, possible_spaces.sort_by(&:scent).last)
+
+    # dest = [
+    #   level.at(x+1, y),
+    #   level.at(x-1, y),
+    #   level.at(x, y-1),
+    #   level.at(x, y+1),
+    # ].select{|t| t.can_move_into?}.sort_by(&:scent).last
+    # return unless dest
+    # if dest.monster == player
+    #   attack(player)
+    # else
+    #   move!(dest)
+    # end
   end
 end

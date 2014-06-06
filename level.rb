@@ -28,12 +28,20 @@ class Level
     @lit_spaces << [x,y]
     @memories[[x,y]] = @map[x][y].chr if @save_memories
   end
+  def scry_terrain(x,y)
+    unless memory(x,y)
+      @memories[[x,y]] = @map[x][y].terrain
+    end
+  end
+
   def lit?(x,y)
     @lit_spaces.include?([x,y])
   end
+
   def blocked?(x,y)
     @map[x][y].block_los?
   end
+
   def memory(x,y)
     @memories[[x,y]]
   end
@@ -41,7 +49,7 @@ class Level
   def process_radiation!(player)
     @radiation += 1
     if @radiation >= @max_radiation
-      # player.get_hit(1, player)
+      player.get_hit(1, player)
     end
   end
 
@@ -49,34 +57,43 @@ class Level
     (@radiation*100)/@max_radiation
   end
 
+  SCENT_DECAY_PER_TILE = 1.0
+  EMITTED_SCENT_PER_TURN = 50.0
+  RETAINED_SCENT = 10.0
+  MAX_SCENT = 100
+  ITERATIONS = 1
+
   def process_scent!(player)
-    new_scent_values = Hash.new(0.0)
-    player.location.scent += 200
-    WIDTH.times do |x|
-      HEIGHT.times do |y|
-        unless at(x,y).block_scent? || at(x,y).scent == 0
-          scent_destinations = [] #[at(x,y)]
-          [-1,0,1].each do |dx|
-            [-1,0,1].each do |dy|
-              unless off_map?(x+dx,y+dy)
-                t = at(x+dx,y+dy)
-                scent_destinations << t unless t.block_scent?
+    ITERATIONS.times do
+      new_scent_values = Hash.new(0.0)
+      player.location.scent += EMITTED_SCENT_PER_TURN
+      WIDTH.times do |x|
+        HEIGHT.times do |y|
+          unless at(x,y).block_scent? || at(x,y).scent == 0
+            scent_destinations = [at(x,y)]*RETAINED_SCENT
+            [-1,0,1].each do |dx|
+              [-1,0,1].each do |dy|
+                unless off_map?(x+dx,y+dy)
+                  t = at(x+dx,y+dy)
+                  scent_destinations << t unless t.block_scent?
+                end
               end
             end
-          end
-          scent_destinations.each do |t|
-            # now, scent_destinations contains all adjacent open tiles.
-            new_scent_values[t] += at(x,y).scent/scent_destinations.count
+            scent_destinations.each do |t|
+              # now, scent_destinations contains all adjacent open tiles.
+              new_scent_values[t] += at(x,y).scent/scent_destinations.count
 
-            # alternatively, always imagine they spread to adjacent tiles, even if they're not expecting
-            # new_scent_values[t] += at(x,y).scent/9
+              # alternatively, always imagine they spread to adjacent tiles, even if they're not expecting
+              # new_scent_values[t] += at(x,y).scent/9
+            end
           end
         end
       end
-    end
-    new_scent_values.each do |t, s|
-      t.scent = s-1.0
-      t.scent = 0 if t.scent < 0
+      new_scent_values.each do |t, s|
+        t.scent = s-SCENT_DECAY_PER_TILE
+        t.scent = 0 if t.scent < 0
+        t.scent = MAX_SCENT if t.scent > MAX_SCENT
+      end
     end
   end
 
@@ -153,16 +170,7 @@ class Level
   end
 
   def place_monsters_and_treasure
-    treasures = 3.times.map do |i|
-      # choose a treasure
-      treasure = if i == 0
-        'E'
-      else
-        # gear of some sort.
-        '~'
-      end
-      treasure
-    end
+    treasure = (['E']*(3 + rand(3))) + (['~']*rand(3))
 
     tiles = []
     WIDTH.times do |x|
@@ -199,7 +207,7 @@ class Level
       @map[a][b] = possibilities.shuffle.pop
 
     end
-    treasures.each do |t|
+    treasure.each do |t|
       a,b = tiles.pop
       @map[a][b] = t
     end

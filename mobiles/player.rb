@@ -39,6 +39,10 @@ class Player < MonsterBase
     monster.get_hit(1,self)
   end
 
+  def die!(player)
+    raise "Game over!"
+  end
+
   def color
     'white'
   end

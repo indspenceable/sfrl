@@ -2,8 +2,9 @@ class FungalWall < MonsterBase
   attr_accessor :hp
 
   def initialize(tile)
-    super(1, tile)
+    super(5, tile)
     @regen_cooldown = 0
+    @next_regen = rand(5)+3
   end
 
   def chr
@@ -11,11 +12,7 @@ class FungalWall < MonsterBase
   end
 
   def color
-    if @hp >= 2
-      'green'
-    else
-      'bright_green'
-    end
+    'green'
   end
 
   def get_hit(a,player)
@@ -25,7 +22,11 @@ class FungalWall < MonsterBase
 
   def act!(_level, _player)
     @regen_cooldown += 1
-    @hp = 2 if @regen_cooldown == 3
+    if @regen_cooldown == @next_regen
+      @hp += 1
+      @next_regen = rand(5)+3
+      @hp = 5 if @hp > 5
+    end
   end
 
   def describe
@@ -89,12 +90,12 @@ class SmellySpore < MonsterBase
   end
 
   def die!(player)
-    location.scent += 700
+    location.scent += 500
     super(player)
   end
 
   def act!(level, player)
-    die!(player) if awake?(level, player)
+    die!(player) if awake?(level, player) && location.distance_to(player)==1
   end
 
   def describe

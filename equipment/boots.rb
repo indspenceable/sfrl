@@ -29,6 +29,10 @@ class BasicBoots < ItemBase
     1
   end
 
+  def install_cost
+    1
+  end
+
   def max_distance
     4
   end

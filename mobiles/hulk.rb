@@ -2,7 +2,7 @@ class Hulk < MonsterBase
   attr_accessor :hp
 
   def initialize(tile)
-    super(3,tile)
+    super(5,tile)
   end
 
   def chr
