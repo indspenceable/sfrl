@@ -95,7 +95,7 @@ class SmellySpore < MonsterBase
   end
 
   def act!(level, player)
-    die!(player) if awake?(level, player) && location.distance_to(player)==1
+    die!(player) if awake?(level, player) && location.distance_to(player)<=3
   end
 
   def describe

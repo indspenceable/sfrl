@@ -24,6 +24,6 @@ class Mutant < MonsterBase
   end
 
   def describe
-    "This mutant is weak, but it's extra legs allow it to move twice as fast as you."
+    "This mutant is weak, but its extra legs allow it to move twice as fast as you."
   end
 end

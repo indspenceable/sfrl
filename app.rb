@@ -1,6 +1,6 @@
 require 'curses'
-require 'pry'
-require 'pry-debugger'
+# require 'pry'
+# require 'pry-debugger'
 require './permissive_fov'
 require 'set'
 
